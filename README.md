@@ -94,3 +94,15 @@ python scripts/send_twitter_alert.py --cron-run
    不采用原始解析直接返回，而是遵循统一的数据持久化规范——“API 调用 ➔ 入库 ➔ 数据库过滤读取 ➔ 返回”，确保本地与云端的数据始终处于完整同步且随时可做历史追溯状态。
 3. **24 小时增量推送**：
    定时任务每天中午 12:00 运行，仅提取最近 24 小时发布的新推文，若无新消息则跳过发送，避免对团队群组造成重复和空白通知的信息骚扰。
+
+---
+
+## 7. 部署与安装地址汇总 (Deployment and Paths)
+
+- **GitHub 远端公开仓库**: `https://github.com/JasonCai2024/skill-twitter-rss-alert.git`
+- **本地同步盘副本目录**: `E:\BaiduSyncdisk\WorkSpace\ForAgent\SKILLS-自媒体\skill-twitter-rss-alert\`
+- **Linux 子系统 (WSL2) OpenClaw 技能工作目录**: `/home/pc/.openclaw/workspace/skills/skill-twitter-rss-alert/`
+- **OpenClaw 定时任务配置注册表**: `/home/pc/.openclaw/cron/jobs.json`（任务 ID: `559e5727-f091-41b2-be9e-42caf54c0eb7`，任务名: `推特RSS关注消息提醒12:00`）
+- **ServiceHub 中转 API 地址**:
+  - 本地开发环境: `http://127.0.0.1:8000/api/video/rss-twitter-data`
+  - 线上生产环境: `https://www.ccailab.top/api/video/rss-twitter-data`
