@@ -63,6 +63,19 @@ python scripts/send_twitter_alert.py --blogger tdinh_me --date 20260701 --webhoo
 python scripts/send_twitter_alert.py --cron-run
 ```
 
+### 4.3 WSL2/Linux 定时任务（Crontab）配置说明
+如需在本地 WSL2 (Ubuntu) 环境中让该任务每天 12:00 自动触发，可以配置系统 Crontab：
+
+1. 打开 WSL2 终端，输入以下命令编辑 crontab：
+   ```bash
+   crontab -e
+   ```
+2. 添加以下定时任务行（将路径替换为您本机的实际路径）：
+   ```text
+   0 12 * * * /usr/bin/python3 /mnt/e/BaiduSyncdisk/WorkSpace/ForAgent/SKILLS-自媒体/skill-twitter-rss-alert/scripts/send_twitter_alert.py --cron-run >> /mnt/e/BaiduSyncdisk/WorkSpace/ForAgent/SKILLS-自媒体/skill-twitter-rss-alert/cron_run.log 2>&1
+   ```
+3. 确保本地 `subscribed_bloggers.json` 文件位于技能文件夹根目录下，脚本会自动加载其中的配置完成批量处理与投递。
+
 ---
 
 ## 5. 凭证安全与隔离规范
