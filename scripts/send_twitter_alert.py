@@ -202,24 +202,10 @@ async def main_async():
         parser.print_help()
         sys.exit(1)
 
-    # 优先级：1. 命令行参数 --webhook  2. 环境变量 FEISHU_WEBHOOK_URL  3. 配置文件
+    # 优先级：1. 命令行参数 --webhook  2. 环境变量 FEISHU_WEBHOOK_URL
     webhook_url = args.webhook
     if not webhook_url:
         webhook_url = os.environ.get("FEISHU_WEBHOOK_URL")
-    
-    if not webhook_url:
-        config_file = os.path.join(project_root, "subscribed_bloggers.json")
-        if os.path.exists(config_file):
-            try:
-                with open(config_file, "r", encoding="utf-8") as f:
-                    sub_config = json.load(f)
-                    webhook_url = sub_config.get("webhook_url")
-            except Exception:
-                pass
-
-    if not webhook_url:
-        print("错误: 必须指定 --webhook，或者配置环境变量 FEISHU_WEBHOOK_URL，或者在 subscribed_bloggers.json 中配置 webhook_url")
-        sys.exit(1)
 
     try:
         res = await fetch_rss_tweets(args.blogger, args.date)
@@ -227,11 +213,15 @@ async def main_async():
         blogger_info = res.get("blogger") or {}
         blogger_name = blogger_info.get("name") or args.blogger
 
-        if posts:
-            card = build_feishu_card(args.blogger, blogger_name, posts, filter_date=args.date)
-            await send_to_feishu(webhook_url, card)
+        if webhook_url:
+            if posts:
+                card = build_feishu_card(args.blogger, blogger_name, posts, filter_date=args.date)
+                await send_to_feishu(webhook_url, card)
+            else:
+                print(f"博主 @{args.blogger} 在指定日期前无推文返回。")
         else:
-            print(f"博主 @{args.blogger} 在指定日期前无推文返回。")
+            # 未指定 webhook 时，直接打印 JSON 结果到标准输出，由智能体在对话中读取和排版
+            print(json.dumps(res, indent=2, ensure_ascii=False))
     except Exception as e:
         print(f"执行失败: {e}")
         sys.exit(1)
