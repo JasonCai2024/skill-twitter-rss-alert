@@ -13,6 +13,33 @@ import asyncio
 from datetime import datetime, timezone
 import httpx
 
+# 添加项目根目录到 Python 模块路径
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# 导入必要模块
+try:
+    from backend.config.settings import settings
+except ImportError:
+    # 兼容没有 settings 时的基准目录
+    settings = None
+
+def load_env():
+    # 手动解析 .env 并加载到 os.environ 中
+    env_file = os.path.join(project_root, ".env")
+    if os.path.exists(env_file):
+        try:
+            with open(env_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        val = v.strip().strip("'").strip('"')
+                        os.environ[k.strip()] = val
+        except Exception:
+            pass
+
 def get_base_url() -> str:
     # 尝试连接本地，如果成功则使用本地开发服务，否则 fallback 到生产环境域名
     try:
@@ -111,19 +138,26 @@ async def send_to_feishu(webhook_url: str, card: dict):
             raise RuntimeError(f"飞书推送失败: status={resp.status_code}, body={data}")
         print("发送成功！")
 
-async def run_cron_batch(project_root: str):
+async def run_cron_batch():
+    load_env()
     config_file = os.path.join(project_root, "subscribed_bloggers.json")
-    if not os.path.exists(config_file):
-        print(f"错误: 找不到订阅博主配置文件 {config_file}")
-        sys.exit(1)
+    
+    # 优先从环境变量获取 webhook
+    webhook_url = os.environ.get("FEISHU_WEBHOOK_URL")
+    bloggers = []
+    
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                sub_config = json.load(f)
+                if not webhook_url:
+                    webhook_url = sub_config.get("webhook_url")
+                bloggers = sub_config.get("bloggers") or []
+        except Exception:
+            pass
 
-    with open(config_file, "r", encoding="utf-8") as f:
-        sub_config = json.load(f)
-
-    webhook_url = sub_config.get("webhook_url")
-    bloggers = sub_config.get("bloggers") or []
     if not webhook_url:
-        print("错误: 未配置飞书 webhook_url")
+        print("错误: 未配置飞书 webhook_url (请指定环境变量 FEISHU_WEBHOOK_URL 或在配置文件中配置)")
         sys.exit(1)
 
     threshold_time = time.time() - 86400
@@ -151,6 +185,7 @@ async def run_cron_batch(project_root: str):
             print(f"处理博主 @{blogger} 失败: {e}")
 
 async def main_async():
+    load_env()
     parser = argparse.ArgumentParser(description="推特 RSS 消息飞书推送工具")
     parser.add_argument("--blogger", type=str, help="推特博主 screen_name，如 tdinh_me")
     parser.add_argument("--date", type=str, help="指定日期，如 20260701，获取该日期及以前的数据")
@@ -159,29 +194,19 @@ async def main_async():
 
     args = parser.parse_args()
 
-    # 寻找本服务所在的 project_root
-    # 优先查找当前运行目录，找不到往上找
-    current_dir = os.getcwd()
-    project_root = current_dir
-    # 尝试检测是否存在 subscribed_bloggers.json
-    if not os.path.exists(os.path.join(project_root, "subscribed_bloggers.json")):
-        # 尝试使用脚本所在的上一层目录
-        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        if os.path.exists(os.path.join(script_dir, "subscribed_bloggers.json")):
-            project_root = script_dir
-        else:
-            # 兼容绝对路径 fallback
-            project_root = "E:\\ServiceHub"
-
     if args.cron_run:
-        await run_cron_batch(project_root)
+        await run_cron_batch()
         return
 
     if not args.blogger:
         parser.print_help()
         sys.exit(1)
 
+    # 优先级：1. 命令行参数 --webhook  2. 环境变量 FEISHU_WEBHOOK_URL  3. 配置文件
     webhook_url = args.webhook
+    if not webhook_url:
+        webhook_url = os.environ.get("FEISHU_WEBHOOK_URL")
+    
     if not webhook_url:
         config_file = os.path.join(project_root, "subscribed_bloggers.json")
         if os.path.exists(config_file):
@@ -193,7 +218,7 @@ async def main_async():
                 pass
 
     if not webhook_url:
-        print("错误: 必须指定 --webhook，或者在 subscribed_bloggers.json 中配置 webhook_url")
+        print("错误: 必须指定 --webhook，或者配置环境变量 FEISHU_WEBHOOK_URL，或者在 subscribed_bloggers.json 中配置 webhook_url")
         sys.exit(1)
 
     try:
